@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, desc
+from sqlalchemy import create_engine, desc, select
 from sqlalchemy.orm import Session, sessionmaker
 
 import router
@@ -45,25 +45,43 @@ class HotelModel(database.Model):
     
     @classmethod
     def find_hotel(cls, hotel_id, database):
+        engine = create_engine(router.select_database(database))   
+        session = Session(engine, future=True)
+        statement = select(HotelModel).filter_by(hotel_id=hotel_id)
+        result = session.execute(statement).scalars().first()
+        return result
+
+    def update_hotel(self, nome, estrelas, diaria, cidade, database):
+        self.nome = nome
+        self.estrelas = estrelas
+        self.diaria =  diaria
+        self.cidade =  cidade
         engine = create_engine(router.select_database(database))
         Session = sessionmaker(engine)
         with Session.begin() as session:
-            hotel = session.query(HotelModel).filter_by(hotel_id=hotel_id).first()
-            if hotel:
-                return {
-                    "hotel_id": hotel.hotel_id,
-                    "nome": hotel.nome,
-                    "estrelas": hotel.estrelas,
-                    "diaria": hotel.diaria,
-                    "cidade": hotel.cidade
-                }
-            else:
-                return None
+            session.query(HotelModel).filter_by(hotel_id=self.hotel_id).update({
+                "nome": nome,
+                "estrelas": estrelas,
+                "diaria": diaria,
+                "cidade": cidade
+                }, synchronize_session="fetch")
+
+    def save_hotel(self, database):
+        engine = create_engine(router.select_database(database))
+        Session = sessionmaker(engine)
+        with Session.begin() as session:
+            session.add(self)
+
+    def delete_hotel(self, database):
+        engine = create_engine(router.select_database(database))
+        Session = sessionmaker(engine)
+        with Session.begin() as session:
+            session.query(HotelModel).filter_by(hotel_id=self.hotel_id).delete(synchronize_session="fetch")
 
     @classmethod
-    def save_hotel(cls, hotel, database):
+    def query_all(cls, database):
         engine = create_engine(router.select_database(database))
-        Session = sessionmaker(engine)
-        with Session.begin() as session:
-            session.add(hotel)
-        
+        session = Session(engine, future=True)
+        statement = select(HotelModel)
+        result = session.execute(statement).scalars().all()
+        return result
