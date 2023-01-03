@@ -65,18 +65,24 @@ class HotelModel(database.Model):
                 "diaria": diaria,
                 "cidade": cidade
                 }, synchronize_session="fetch")
+            session.commit()
+            session.close()
 
     def save_hotel(self, database):
         engine = create_engine(router.select_database(database))
         Session = sessionmaker(engine)
         with Session.begin() as session:
             session.add(self)
+            session.commit()
+            session.close()
 
     def delete_hotel(self, database):
         engine = create_engine(router.select_database(database))
         Session = sessionmaker(engine)
         with Session.begin() as session:
             session.query(HotelModel).filter_by(hotel_id=self.hotel_id).delete(synchronize_session="fetch")
+            session.commit()
+            session.close()
 
     @classmethod
     def query_all(cls, database):

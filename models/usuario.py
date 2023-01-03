@@ -1,23 +1,26 @@
+from cryptography.fernet import Fernet
 from sqlalchemy import create_engine, desc, select
 from sqlalchemy.orm import Session, sessionmaker
 
 import router
 from sql_alchemy import database
 
+key = b'PCHl_MjGyEyBxLYha3S-cWg_SDDmjT4YYaKYh4Z7Yug='
 
 class UserModel(database.Model):
     __tablename__ = 'usuarios'
 
     user_id = database.Column(database.Integer, primary_key = True)
     username = database.Column(database.String(40))
-    password = database.Column(database.String(40))
+    password = database.Column(database.String(400))
     first_name = database.Column(database.String(40))
     last_name = database.Column(database.String(40))
-    mail = database.column(database.String(100))
+    mail = database.Column(database.String(100))
 
-    def __init__(self, username, password, first_name, last_name, mail):
+    def __init__(self, user_id, username, password, first_name, last_name, mail):
+        self.user_id = user_id
         self.username = username
-        self.password = password,
+        self.password = password
         self.first_name = first_name
         self.last_name = last_name
         self.mail = mail
@@ -33,22 +36,82 @@ class UserModel(database.Model):
         }
     
     @classmethod
+    def get_new_id(cls, database):
+        engine = create_engine(router.select_database(database))
+        session = Session(engine, future=True)
+        statement = select(UserModel).order_by(UserModel.user_id.desc())
+        result = session.execute(statement).scalars().first()
+        if result:
+            return result.user_id + 1
+        return 1
+
+
+    @classmethod
     def find_user(cls, user_id, database):
         engine = create_engine(router.select_database(database))
         session = Session(engine, future=True)
         statement = select(UserModel).filter_by(user_id=user_id)
         result = session.execute(statement).scalars().first()
+        session.close()
         return result
+
+    @classmethod
+    def find_by_username(cls, username, database):
+        engine = create_engine(router.select_database(database))
+        session = Session(engine, future=True)
+        statement = select(UserModel).filter_by(username=username)
+        result = session.execute(statement).scalars().first()
+        return result
+    
+    @classmethod
+    def find_by_mail(cls, mail, database):
+        engine = create_engine(router.select_database(database))
+        session = Session(engine, future=True)
+        statement = select(UserModel).filter_by(mail=mail)
+        result = session.execute(statement).scalars().first()
+        return result
+
+    @classmethod
+    def encrypt_password(cls, password_provided):
+        cipher_suite = Fernet(key)
+        password = password_provided.encode()
+        ciphered_password = cipher_suite.encrypt(password)
+        return ciphered_password
+    @classmethod
+    def decrypt_password(cls, ciphered_password):
+        cipher_suite = Fernet(key)
+        unciphered_text = (cipher_suite.decrypt(ciphered_password))
+        password = unciphered_text.decode()
+        return password
+    @classmethod
+    def verify_safe_password(cls, password):
+        unsafe_chars = [';', '/', '\\', '>', '<', '"', "'", ',']
+        for char in unsafe_chars:
+            if char in password:
+                return char
+        return True
+    @classmethod
+    def verify_length_password(cls, password):
+        if len(password) < 8:
+            return False
+        return True
+    
+        
 
     def save_user(self, database):
         engine = create_engine(router.select_database(database))
-        Session = sessionmaker(engine)
+        Session = sessionmaker(engine, future=True)
         with Session.begin() as session:
             session.add(self)
+            session.commit()
+            session.close()
+
     
-    def delete_hotel(self, database):
+    def delete_user(self, database):
         engine = create_engine(router.select_database(database))
         Session = sessionmaker(engine)
         with Session.begin() as session:
             session.query(UserModel).filter_by(user_id=self.user_id).delete(synchronize_session="fetch")
+            session.commit()
+            session.close()
 
